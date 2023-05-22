@@ -1,0 +1,77 @@
+parameters:
+# Root path where DBT code is located
+- name: ProjectPath 
+  default: ''
+# Repository ref for job and content template
+- name: CheckoutReposityRef
+  default: 'git://Data.Template/Data.Template.DBT@refs/heads/dev'
+# Root path where DBT tools files are located (repo template generally)
+- name: 'PackageRootPath'
+# Additional contents that you want to embed into the artifact at dbt/dbt_src
+- name: Contents
+  default: |
+    **/*.sql
+    **/*.yml
+
+jobs:
+- job: Build_DBT_Project
+  displayName: 'Build DBT Project'
+  steps:
+  - checkout: self #not the template but repository were the pipeline is executed
+  - checkout: ${{ parameters.CheckoutReposityRef }}
+
+  - task: UsePythonVersion@0
+    displayName: Install Python
+    inputs:
+      versionSpec: '3.9'
+
+  - script:
+      pip install --upgrade setuptools
+      pip install dbt-core dbt-snowflake
+    displayName: Install DBT
+
+  - task: CopyFiles@2
+    displayName: 'Copy tools files'
+    inputs:
+      Sourcefolder: '${{ parameters.PackageRootPath }}/tools'
+      TargetFolder: '$(Build.artifactstagingdirectory)/dbt'
+      contents: |
+        **/*
+
+  # Compile DBT Project
+  - bash: |
+      dbt deps --profiles-dir .
+      dbt compile --profiles-dir .
+    displayName: DBT Dependencies et compilation
+    workingDirectory: ${{ parameters.ProjectPath }}
+
+  - task: CopyFiles@2
+    displayName: 'Copy project files'
+    inputs:
+      sourceFolder: ${{ parameters.ProjectPath }}
+      targetFolder: '$(Build.artifactstagingdirectory)/dbt/dbt_src'
+      contents: |
+        **/*
+        ${{ parameters.Contents }}
+
+  - task: CopyFiles@2
+    displayName: 'Copy docs files'
+    inputs:
+      sourceFolder: ${{ parameters.ProjectPath }}
+      targetFolder: '$(Build.artifactstagingdirectory)/dbt/dbt_docs'
+      contents: |
+        **/*
+        ${{ parameters.Contents }}
+
+  # generate docs
+  - bash: |
+      dbt docs generate --no-compile
+    displayName: DBT Generate Docs
+    workingDirectory: $(Build.artifactstagingdirectory)/dbt/dbt_docs
+
+  # Publish valide dbt project
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.artifactstagingdirectory)/dbt'
+      artifactName: dbt
+    displayName: 'Publish artifact'

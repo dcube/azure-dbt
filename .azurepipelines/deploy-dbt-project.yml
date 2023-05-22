@@ -1,0 +1,46 @@
+# Explicitly set none for repositry trigger
+trigger:
+- none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+resources:
+  pipelines:
+  - pipeline: "resourceBuild"  # Name of the pipeline resource
+    source: "Build-DBT" # Name of the triggering pipeline
+    trigger: 
+      branches:
+      - develop
+      - main
+      - release/*
+      - hotfix/*
+      - feature/*
+      - fix/*
+  repositories:
+    - repository: templates
+      type: git
+      name: Data.Template/Data.Template.DBT
+      ref: refs/tags/v1.0
+
+variables:
+  ResourceName: 'resourceBuild'
+  RegistryServiceConnection: 'xxx'
+
+stages:
+- stage: Test
+  displayName: Test
+  condition: or(eq(variables['Build.SourceBranch'],'refs/heads/develop'), startsWith(variables['Build.SourceBranch'],'refs/heads/feature'), startsWith(variables['Build.SourceBranch'],'refs/heads/fix'))
+
+  variables:
+  - group: 'Infra-Test'
+
+  jobs:
+  - template: .azurepipelines/release-docker-push-Template.yml@templates
+    parameters: 
+      RegistryServiceConnection: '${{ variables.RegistryServiceConnection }}'
+      EnvironmentName: Test
+      ContainerRepositoryDBT: 'dwh-dbt'
+      ContainerRepositoryDocs: 'dwh-dbt-docs'
+      PipelineResourceName: '${{ variables.ResourceName }}'
+

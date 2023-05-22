@@ -1,0 +1,38 @@
+parameters:
+- name: 'RegistryServiceConnection'
+- name: 'PipelineResourceName'
+- name: 'EnvironmentName'
+- name: 'vmImageName'
+- name: 'ContainerRegistryName'
+
+jobs:
+  - deployment: DeployDocker
+    displayName: Deploy Docker
+    environment: ${{ parameters.EnvironmentName }}
+    pool: 
+      vmImage: '${{ parameters.vmImageName }}'
+    strategy: 
+      runOnce:
+        deploy:
+          steps:
+          - task: DockerInstaller@0
+            displayName: 'Install Docker'
+            inputs:
+              dockerVersion: '17.09.0-ce'
+          
+          - task: Docker@2
+            displayName: 'Connect to Registry'
+            inputs:
+              containerRegistry: '${{ parameters.RegistryServiceConnection }}'
+              command: 'login'
+
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: |
+                $sourceImage= "${{ parameters.ContainerRegistryName }}.azurecr.io/$(ContainerRepository):$(resources.pipeline.resourceBuild.runID)";
+                $newtag= "${{ parameters.ContainerRegistryName }}.azurecr.io/$(ContainerRepository):$($(ContainerImageTag))"
+                docker pull $sourceImage
+                docker tag $sourceImage $newtag
+                docker push $newtag
+              pwsh: true

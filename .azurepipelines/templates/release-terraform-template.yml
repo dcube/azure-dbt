@@ -1,0 +1,87 @@
+  parameters:
+  - name: 'ServiceConnection'
+  - name: 'PipelineResourceName'
+  - name: 'EnvironmentName'
+  - name: 'vmImageName'
+  - name: 'TerraformStorageAccountName'
+  - name: 'TerraformResourceGroupName'
+  - name: 'TerraformContainerName'
+  - name: 'TerraformKey'
+  - name: 'TerraformVersion'
+    default: '1.3.7'
+  # Use dependsOnJob if you want to make this job depending from another job
+  - name: 'dependsOnJob'
+    default: ''
+  # True if you only want "terraform plan"
+  # False if you want "terraform apply"
+  - name: 'OnlyPlan'
+    default: false
+  - name: 'ArtifactName'
+    default: 'Project'
+
+
+  jobs:
+  - deployment: DeployInfra
+    displayName: Deploy Infra
+    ${{ if ne(parameters.dependsOnJob, '') }}:
+      dependsOn: ${{ parameters.dependsOnJob }}
+    environment: ${{ parameters.EnvironmentName }}
+    pool: 
+      vmImage: '${{ parameters.vmImageName }}'
+    strategy: 
+      runOnce:
+        deploy:
+          steps:
+                      
+          - task: replacetokens@5
+            inputs:
+              rootDirectory: '$(Pipeline.Workspace)/${{ parameters.PipelineResourceName }}/${{ parameters.ArtifactName }}/Terraform'
+              targetFiles: 'variables.auto.tfvars'
+              encoding: 'auto'
+              tokenPattern: 'rm'
+              writeBOM: false
+              actionOnMissing: 'warn'
+              keepToken: false
+              actionOnNoFiles: 'continue'
+              enableTransforms: false
+              enableRecursion: false
+              useLegacyPattern: false
+              enableTelemetry: true
+
+          - task: TerraformInstaller@0
+            displayName: 'Install Terraform ${{ parameters.TerraformVersion }}'
+            inputs:
+              terraformVersion: ${{ parameters.TerraformVersion }}
+          
+          - task: TerraformTaskV3@3
+            displayName: 'Terraform : azurerm init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(Pipeline.Workspace)/${{ parameters.PipelineResourceName }}/${{ parameters.ArtifactName }}/Terraform'
+              commandOptions: '-no-color'
+              backendServiceArm: '${{ parameters.ServiceConnection }}'
+              backendAzureRmResourceGroupName: '${{ parameters.TerraformResourceGroupName }}'
+              backendAzureRmStorageAccountName: '${{ parameters.TerraformStorageAccountName }}'
+              backendAzureRmContainerName: '${{ parameters.TerraformContainerName }}'
+              backendAzureRmKey: '${{ parameters.TerraformKey }}'
+
+          - task: TerraformTaskV3@3
+            displayName: 'Terraform : azurerm plan'
+            condition: ${{ parameters.OnlyPlan }}
+            inputs:
+              provider: 'azurerm'
+              command: plan
+              workingDirectory: '$(Pipeline.Workspace)/${{ parameters.PipelineResourceName }}/${{ parameters.ArtifactName }}/Terraform'
+              commandOptions: '-no-color --var-file=variables.auto.tfvars'
+              environmentServiceNameAzureRM: '${{ parameters.ServiceConnection }}'
+
+          - task: TerraformTaskV3@3
+            displayName: 'Terraform : azurerm validate and apply'
+            condition: not(${{ parameters.OnlyPlan }})
+            inputs:
+              provider: 'azurerm'
+              command: apply
+              workingDirectory: '$(Pipeline.Workspace)/${{ parameters.PipelineResourceName }}/${{ parameters.ArtifactName }}/Terraform'
+              commandOptions: '-no-color --var-file=variables.auto.tfvars'
+              environmentServiceNameAzureRM: '${{ parameters.ServiceConnection }}'

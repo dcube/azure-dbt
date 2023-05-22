@@ -1,0 +1,25 @@
+  parameters:
+  # Repository ref for job and content template
+  - name: CheckoutReposityRef
+    default: 'git://Data.Template/Data.Template.InfraAsCode@refs/heads/develop'
+
+  jobs:
+  - job: 'Publish_Project_Terraform'
+    displayName: 'Publish Project Terraform for Infra'
+    steps:    
+    - checkout: self #not the template but repository were the pipeline is executed
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Terraform Pipeline Artifact'
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)'
+        artifact: Project
+
+  - job: 'Publish_Template_Terraform'
+    displayName: 'Publish Template Terraform for Infra'
+    steps:    
+    - checkout: ${{ parameters.CheckoutReposityRef }}
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Terraform Pipeline Artifact'
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)'
+        artifact: Data.Template.InfraAsCode

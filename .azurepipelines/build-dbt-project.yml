@@ -1,0 +1,27 @@
+trigger:
+  branches:
+    include:
+    - develop
+    - main
+  paths:
+    include:
+    - '/dbt_project'
+
+pool:
+  vmImage: 'ubuntu-latest'
+  
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: Data.Template/Data.Template.DBT
+      ref: refs/tags/v1.0
+    
+name: CI-Data.DWH.DBT.$(BuildID)
+
+jobs:
+- template: .azurepipelines/build-dbt-project-Template.yml@templates
+  parameters:
+    ProjectPath: '$(Build.Repository.LocalPath)/$(Build.Repository.Name)/dbt_project'
+    PackageRootPath: '$(Build.SourcesDirectory)/Data.Template.DBT'
+    CheckoutReposityRef: templates

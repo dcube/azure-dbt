@@ -1,0 +1,24 @@
+trigger:
+  branches:
+    include:
+    - develop
+  paths:
+    include:
+    - terraform/*
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: Data.Template/Data.Template.InfraAsCode
+      ref: refs/tags/v0.2
+    
+name: CI-Data.Infra.$(BuildID)
+
+pool:
+  vmImage: 'ubuntu-latest'
+  
+jobs:
+- template: .azurepipelines/build-terraform-template.yml@templates
+  parameters:
+    CheckoutReposityRef: templates

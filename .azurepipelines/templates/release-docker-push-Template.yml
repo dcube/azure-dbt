@@ -1,0 +1,40 @@
+parameters:
+- name: 'RegistryServiceConnection'
+- name: 'EnvironmentName'
+- name: 'ContainerRepositoryDBT'
+- name: 'ContainerRepositoryDocs'
+- name: PipelineResourceName
+  default: 'resourceBuild'
+
+jobs:
+  - deployment: DeployDocker
+    displayName: Deploy Docker
+    environment: ${{ parameters.EnvironmentName }}
+    strategy: 
+      runOnce:
+        deploy:
+          steps:
+              
+          - task: Docker@2
+            displayName: Build and push DBT image
+            inputs:
+              containerRegistry: '${{ parameters.RegistryServiceConnection }}'
+              command: 'buildAndPush'
+              Dockerfile: '$(Pipeline.Workspace)/${{ parameters.PipelineResourceName }}/dbt/Dockerfile'
+              buildContext: '$(Pipeline.Workspace)/${{ parameters.PipelineResourceName }}/dbt'
+              repository: '${{ parameters.ContainerRepositoryDBT }}'
+              tags: |
+                $(resources.pipeline.resourceBuild.runID)
+                $(ContainerImageTag)
+          
+          - task: Docker@2
+            displayName: Build and push DBT DOCS image
+            inputs:
+              containerRegistry: '${{ parameters.RegistryServiceConnection }}'
+              command: 'buildAndPush'
+              Dockerfile: '$(Pipeline.Workspace)/${{ parameters.PipelineResourceName }}/dbt/Dockerfile-dbt-docs'
+              buildContext: '$(Pipeline.Workspace)/${{ parameters.PipelineResourceName }}/dbt'
+              repository: '${{ parameters.ContainerRepositoryDocs }}'
+              tags: |
+                $(resources.pipeline.resourceBuild.runID)
+                $(ContainerImageTag)

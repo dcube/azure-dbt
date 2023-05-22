@@ -1,0 +1,46 @@
+# Explicitly set none for repositry trigger
+trigger:
+- none
+
+resources:
+  pipelines:
+  - pipeline: "resourceBuild"  # Name of the pipeline resource
+    source: "Build-Data-Infra" # Name of the triggering pipeline
+    trigger: 
+      branches:
+      - develop
+      - main
+      - release/*
+      - hotfix/*
+      - feature/*
+      - fix/*
+  repositories:
+    - repository: templates
+      type: git
+      name: Data.Template/Data.Template.InfraAsCode
+      ref: refs/tags/v0.2
+
+variables:
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Test
+  displayName: Test
+  condition: or(eq(variables['Build.SourceBranch'],'refs/heads/develop'), startsWith(variables['Build.SourceBranch'],'refs/heads/feature'), startsWith(variables['Build.SourceBranch'],'refs/heads/fix'))
+
+  variables:
+  - group: 'Infra-Test'
+
+  jobs:
+  - template: .azurepipelines/release-terraform-template.yml@templates
+    parameters: 
+      ServiceConnection: 'SC-Data-DWH-Test'
+      vmImageName: $(vmImageName)
+      PipelineResourceName: 'resourceBuild'
+      EnvironmentName: Test
+      TerraformStorageAccountName: 'stterraformXXX$(Environment)01'
+      TerraformResourceGroupName: '$(TerraformResourceGroupName)'
+      TerraformContainerName: 'tfstate-data-$(Environment)'
+      TerraformKey: 'data.dwh.infra.tfstate'
+      TerraformVersion: 1.3.7
+
